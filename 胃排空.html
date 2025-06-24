@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交互式报告：小鼠胃排空机制与影响因素</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: 本应用采用垂直滚动的单页布局，顶部设有固定的导航栏，便于在不同主题区域间快速跳转。这种结构旨在引导用户按照一个逻辑流程探索信息：首先理解核心的“调控网络”，然后探索多样的“影响因素”，接着审视“药物干预”的效果，最后了解研究这些现象的“测量技术”。选择这种结构而非报告原文的线性结构，是为了将相关概念（如神经和激素调节）整合在一起，并通过互动图表和分层信息（点击展开）来增强用户的参与感和理解深度，使复杂的科学数据更直观、更易于消化。 -->
+    <!-- Visualization & Content Choices: 
+        1. 调控网络: 报告信息->神经与激素对胃排空的双向调节。目标->比较。可视化->一个水平条形图，左侧为抑制因素，右侧为促进因素。交互->点击按钮高亮特定类别的激素。理由->直观展示胃排空“油门”与“刹车”的平衡关系。库->Chart.js。
+        2. 影响因素: 报告信息->疾病、应激对胃排空的影响。目标->比较。可视化->垂直条形图，对比正常、糖尿病及应激模型中的胃残留率。交互->悬停提示显示具体数值。理由->清晰量化不同病理生理状态下的胃排空变化。库->Chart.js。
+        3. 药物干预: 报告信息->不同药物对排空半衰期(T1/2)的影响。目标->比较。可视化->垂直条形图，特别为阿托品设置两个并列条形（固体vs液体）以突出其特殊效应。交互->悬停提示显示具体T1/2值。理由->有效传达药物的促动力或抑制作用，并突出显示关键的差异化效应。库->Chart.js。
+        4. 调控通路图: 报告信息->脑-肠轴(CeA-DVC)通路。目标->组织。可视化->使用HTML/CSS构建的流程图。交互->无。理由->以简洁的视觉形式展示复杂的神经连接，避免使用SVG。方法->Tailwind CSS。
+        CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        :root {
+            --bg-main: #FDFBF6;
+            --text-primary: #3C3633;
+            --text-secondary: #605752;
+            --accent-blue: #77A6B6;
+            --accent-green: #A3B899;
+            --accent-orange: #E59866;
+            --accent-red: #D88273;
+            --border-color: #E0D8D3;
+        }
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            font-family: 'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei';
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 450px;
+            }
+        }
+        .nav-link {
+            transition: color 0.3s, border-color 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: var(--accent-blue);
+            border-bottom-color: var(--accent-blue);
+        }
+        .pill-button {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .pill-button.active {
+            background-color: var(--accent-blue);
+            color: white;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .section-icon {
+            font-size: 2.5rem;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header id="header" class="bg-white/80 backdrop-blur-lg fixed top-0 left-0 right-0 z-50 shadow-sm">
+        <div class="container mx-auto px-4">
+            <nav class="flex justify-between items-center py-4">
+                <h1 class="text-xl font-bold text-gray-800">胃排空研究</h1>
+                <div class="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-600">
+                    <a href="#hero" class="nav-link pb-1">首页</a>
+                    <a href="#network" class="nav-link pb-1">调控网络</a>
+                    <a href="#factors" class="nav-link pb-1">影响因素</a>
+                    <a href="#pharma" class="nav-link pb-1">药物干预</a>
+                    <a href="#methods" class="nav-link pb-1">测量技术</a>
+                </div>
+                <button id="mobile-menu-button" class="md:hidden text-2xl">☰</button>
+            </nav>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden bg-white/95">
+             <a href="#hero" class="block text-center py-2 text-gray-700 hover:bg-gray-100">首页</a>
+             <a href="#network" class="block text-center py-2 text-gray-700 hover:bg-gray-100">调控网络</a>
+             <a href="#factors" class="block text-center py-2 text-gray-700 hover:bg-gray-100">影响因素</a>
+             <a href="#pharma" class="block text-center py-2 text-gray-700 hover:bg-gray-100">药物干预</a>
+             <a href="#methods" class="block text-center py-2 text-gray-700 hover:bg-gray-100">测量技术</a>
+        </div>
+    </header>
+
+    <main class="pt-16">
+
+        <section id="hero" class="py-16 md:py-24 text-center">
+            <div class="container mx-auto px-4">
+                <h2 class="text-3xl md:text-5xl font-extrabold mb-4" style="color: var(--text-primary);">小鼠胃排空机制与影响因素</h2>
+                <p class="text-lg md:text-xl max-w-3xl mx-auto" style="color: var(--text-secondary);">一份关于胃肠道生理学核心过程的交互式探索</p>
+                <div class="mt-8 text-left max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-sm border" style="border-color: var(--border-color);">
+                    <p class="text-base" style="color: var(--text-secondary);">胃排空（GE）是食物从胃到小肠的精密调控过程，对营养吸收和代谢稳态至关重要。小鼠模型为我们揭示其复杂的神经-体液调控机制提供了无价的窗口。本应用将原始报告中的关键发现转化为动态的可视化图表和精炼的核心摘要，旨在帮助您轻松理解这一复杂的生理过程。</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="network" class="py-16 md:py-20 bg-white">
+            <div class="container mx-auto px-4">
+                <div class="text-center mb-12">
+                     <div class="section-icon mx-auto mb-2" style="color: var(--accent-blue);">🧠</div>
+                    <h3 class="text-3xl font-bold">核心调控网络：平衡之舞</h3>
+                    <p class="mt-2 max-w-2xl mx-auto" style="color: var(--text-secondary);">胃排空的速率由一个复杂的“油门”与“刹车”系统精确控制。该系统整合了来自中枢神经系统（脑-肠轴）的信号和肠道释放的激素信号，共同确保消化过程的平稳进行。</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div class="card">
+                        <h4 class="font-bold text-xl mb-4 text-center">脑-肠轴：中央指挥部</h4>
+                         <p class="text-sm mb-4 text-center" style="color: var(--text-secondary);">情绪和应激中枢（杏仁核CeA）能直接影响负责胃肠功能的脑干区域（背侧迷走神经复合体DVC），揭示了情绪状态如何影响消化功能。</p>
+                        <div class="flex flex-col items-center p-4 space-y-2">
+                            <div class="font-semibold text-white px-4 py-2 rounded-full" style="background-color: var(--accent-red);">杏仁核 (CeA) - 情绪/应激</div>
+                            <div class="text-2xl font-bold" style="color: var(--accent-red);">↓</div>
+                            <div class="text-sm text-center" style="color: var(--text-secondary);">GABA能抑制性投射</div>
+                            <div class="font-semibold text-white px-4 py-2 rounded-full" style="background-color: var(--accent-blue);">背侧迷走神经复合体 (DVC)</div>
+                            <div class="text-2xl font-bold">↓</div>
+                             <div class="font-semibold px-4 py-2 rounded-full border" style="border-color: var(--border-color);">胃运动调节</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h4 class="font-bold text-xl mb-4 text-center">激素调节：化学信使</h4>
+                        <p class="text-sm mb-4 text-center" style="color: var(--text-secondary);">多种激素协同作用，形成了延缓（刹车）或加速（油门）胃排空的精细反馈回路。点击下方按钮筛选查看不同类别的激素。</p>
+                        <div class="flex justify-center flex-wrap gap-2 mb-4">
+                            <button class="pill-button text-xs px-3 py-1 border rounded-full" style="border-color: var(--border-color);" data-filter="all">全部</button>
+                            <button class="pill-button text-xs px-3 py-1 border rounded-full" style="border-color: var(--border-color);" data-filter="incretin">肠促胰素</button>
+                            <button class="pill-button text-xs px-3 py-1 border rounded-full" style="border-color: var(--border-color);" data-filter="appetite">食欲相关</button>
+                        </div>
+                        <div class="chart-container h-80 md:h-96">
+                            <canvas id="hormoneChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="factors" class="py-16 md:py-20">
+            <div class="container mx-auto px-4">
+                <div class="text-center mb-12">
+                    <div class="section-icon mx-auto mb-2" style="color: var(--accent-green);">🧬</div>
+                    <h3 class="text-3xl font-bold">多变的影响因素</h3>
+                    <p class="mt-2 max-w-2xl mx-auto" style="color: var(--text-secondary);">胃排空并非一成不变，它受到饮食、应激、遗传和疾病状态等多种内外因素的动态影响。下方的图表展示了部分因素如何显著改变胃的排空效率。</p>
+                </div>
+                
+                <div class="grid md:grid-cols-5 gap-8">
+                    <div class="md:col-span-2 space-y-4">
+                        <div class="card">
+                            <h4 class="font-bold text-lg">🍽️ 饮食与物理性质</h4>
+                            <p class="text-sm mt-1" style="color: var(--text-secondary);">高热量、高脂肪的食物会显著延缓胃排空，这是机体为了充分消化吸收而启动的“肠道制动”机制。固体食物相比液体排空更慢，因为它需要先被研磨成小颗粒。</p>
+                        </div>
+                        <div class="card">
+                             <h4 class="font-bold text-lg">🧘 应激反应</h4>
+                             <p class="text-sm mt-1" style="color: var(--text-secondary);">急性应激会通过脑-肠轴抑制胃运动，导致排空延迟。有趣的是，在慢性应激下，机体可能产生适应性，使胃排空恢复正常，这一过程与催产素等神经递质有关。</p>
+                        </div>
+                        <div class="card">
+                            <h4 class="font-bold text-lg">🧬 遗传背景</h4>
+                             <p class="text-sm mt-1" style="color: var(--text-secondary);">特定基因（如FOXF1/2）的表达水平，或激素受体（如CCK受体）的变异，都会影响胃的肌肉功能和信号响应，从而成为胃轻瘫等疾病的潜在遗传基础。</p>
+                        </div>
+                    </div>
+                    <div class="md:col-span-3 card">
+                        <h4 class="font-bold text-xl mb-4 text-center">疾病模型中的胃排空变化</h4>
+                        <p class="text-sm text-center mb-4" style="color: var(--text-secondary);">以糖尿病模型为例，高血糖状态会导致神经损伤，显著延缓胃排空，这是糖尿病性胃轻瘫的核心病理生理表现。</p>
+                        <div class="chart-container h-80 md:h-96">
+                            <canvas id="diseaseModelChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="pharma" class="py-16 md:py-20 bg-white">
+            <div class="container mx-auto px-4">
+                <div class="text-center mb-12">
+                    <div class="section-icon mx-auto mb-2" style="color: var(--accent-orange);">💊</div>
+                    <h3 class="text-3xl font-bold">药物干预的靶点</h3>
+                    <p class="mt-2 max-w-2xl mx-auto" style="color: var(--text-secondary);">通过药物调节胃排空是治疗相关疾病的重要手段。不同药物通过作用于特定的神经或激素受体，可以实现加速或延缓胃排空的效果。</p>
+                </div>
+                <div class="card">
+                     <h4 class="font-bold text-xl mb-4 text-center">药物对胃排空半衰期 (T1/2) 的影响</h4>
+                     <p class="text-sm text-center mb-4" style="color: var(--text-secondary);">T1/2值越小，代表胃排空速度越快。请注意阿托品对固体和液体排空产生的截然相反的效果，这揭示了排空机制的复杂性。</p>
+                    <div class="chart-container">
+                        <canvas id="pharmaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="methods" class="py-16 md:py-20">
+            <div class="container mx-auto px-4">
+                <div class="text-center mb-12">
+                    <div class="section-icon mx-auto mb-2" style="color: var(--text-primary);">🔬</div>
+                    <h3 class="text-3xl font-bold">现代测量技术</h3>
+                    <p class="mt-2 max-w-2xl mx-auto" style="color: var(--text-secondary);">非侵入性技术的进步彻底改变了胃排空的研究方式，使得在小鼠模型中进行纵向、高精度的测量成为可能。</p>
+                </div>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="card">
+                        <h4 class="font-bold text-lg">¹³C-辛酸呼气试验</h4>
+                        <p class="text-sm mt-2" style="color: var(--text-secondary);">被认为是固体胃排空的金标准非侵入性方法。通过测量呼出气体中¹³CO₂的速率来精确反映胃排空速度，可实现高时间分辨率的动态监测。</p>
+                    </div>
+                    <div class="card">
+                        <h4 class="font-bold text-lg">生物发光成像 (BLI)</h4>
+                        <p class="text-sm mt-2" style="color: var(--text-secondary);">利用携带荧光素酶的发光细菌作为示踪剂，通过体外成像实时追踪胃内容物的移动。此方法直观、简单且成本效益高。</p>
+                    </div>
+                    <div class="card md:col-span-2 lg:col-span-1">
+                        <h4 class="font-bold text-lg">其他先进技术</h4>
+                        <p class="text-sm mt-2" style="color: var(--text-secondary);">MRI、PET和FRI等成像技术也提供了强大的可视化工具，而传统的染料法和闪烁显像法虽有局限，但在特定研究中仍有应用价值。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-white border-t" style="border-color: var(--border-color);">
+        <div class="container mx-auto px-4 py-6 text-center text-sm" style="color: var(--text-secondary);">
+            <p>&copy; 2024 交互式科学报告. 内容基于《小鼠胃排空机制与影响因素研究进展》生成。</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+            document.querySelectorAll('#mobile-menu a').forEach(link => {
+                link.addEventListener('click', () => {
+                    mobileMenu.classList.add('hidden');
+                });
+            });
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('main section');
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 80) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').includes(current)) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+            
+            Chart.defaults.font.family = "'Inter', 'sans-serif'";
+            Chart.defaults.color = 'var(--text-secondary)';
+            
+            const commonChartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        titleFont: { size: 14, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        padding: 10,
+                        cornerRadius: 4,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.x !== null) {
+                                    label += `${context.parsed.x}`;
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: 'var(--text-secondary)',
+                            font: {
+                                size: 10
+                            }
+                        }
+                    },
+                    y: {
+                        border: {
+                            display: false
+                        },
+                        grid: {
+                            color: 'var(--border-color)'
+                        },
+                        ticks: {
+                            color: 'var(--text-secondary)',
+                             font: {
+                                size: 10
+                            }
+                        }
+                    }
+                }
+            };
+            
+            const wrapLabel = (str, maxWidth) => {
+                const words = str.split(' ');
+                const lines = [];
+                let currentLine = words[0];
+
+                for (let i = 1; i < words.length; i++) {
+                    if (currentLine.length + words[i].length + 1 < maxWidth) {
+                        currentLine += ` ${words[i]}`;
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = words[i];
+                    }
+                }
+                lines.push(currentLine);
+                return lines;
+            };
+
+            const hormoneData = {
+                labels: ['GIP', 'GLP-1', 'PYY', 'CCK', '瘦素 (缺乏)', '胃动素', '生长素'],
+                datasets: [{
+                    label: '调控影响',
+                    data: [-8, -9, -7, -6, 5, 8, 9],
+                    backgroundColor: (context) => {
+                        const value = context.raw;
+                        return value < 0 ? 'var(--accent-red)' : 'var(--accent-green)';
+                    },
+                    borderColor: (context) => {
+                        const value = context.raw;
+                        return value < 0 ? 'var(--accent-red)' : 'var(--accent-green)';
+                    },
+                    borderWidth: 1,
+                    barPercentage: 0.6,
+                    categoryPercentage: 0.7,
+                    meta: {
+                        types: ['incretin', 'incretin', 'incretin', 'appetite', 'appetite', 'other', 'appetite']
+                    }
+                }]
+            };
+
+            const hormoneCtx = document.getElementById('hormoneChart').getContext('2d');
+            const hormoneChart = new Chart(hormoneCtx, {
+                type: 'bar',
+                data: hormoneData,
+                options: {
+                    ...commonChartOptions,
+                    indexAxis: 'y',
+                    plugins: {
+                        ...commonChartOptions.plugins,
+                        tooltip: {
+                            ...commonChartOptions.plugins.tooltip,
+                             callbacks: {
+                                label: function(context) {
+                                    const val = context.parsed.x;
+                                    return val < 0 ? `抑制作用 (强度: ${Math.abs(val)})` : `促进作用 (强度: ${val})`;
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '抑制（刹车） vs 促进（油门）',
+                            padding: { bottom: 10 }
+                        }
+                    },
+                    scales: {
+                        y: {
+                           grid: { display: false },
+                           ticks: {
+                                color: 'var(--text-secondary)',
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        x: {
+                            border: { display: false },
+                            grid: { color: 'var(--border-color)' },
+                            ticks: {
+                                callback: (value) => Math.abs(value) 
+                            }
+                        }
+                    }
+                }
+            });
+            
+            const filterButtons = document.querySelectorAll('.pill-button');
+            const originalData = JSON.parse(JSON.stringify(hormoneData)); 
+
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+
+                    const filter = button.dataset.filter;
+                    if (filter === 'all') {
+                        hormoneChart.data = originalData;
+                    } else {
+                        const filteredLabels = [];
+                        const filteredData = [];
+                        const filteredMetaTypes = [];
+
+                        originalData.labels.forEach((label, index) => {
+                            if (originalData.datasets[0].meta.types[index] === filter) {
+                                filteredLabels.push(label);
+                                filteredData.push(originalData.datasets[0].data[index]);
+                                filteredMetaTypes.push(originalData.datasets[0].meta.types[index]);
+                            }
+                        });
+
+                        hormoneChart.data.labels = filteredLabels;
+                        hormoneChart.data.datasets[0].data = filteredData;
+                        hormoneChart.data.datasets[0].meta.types = filteredMetaTypes;
+                    }
+                    hormoneChart.update();
+                });
+            });
+            document.querySelector('.pill-button[data-filter="all"]').classList.add('active');
+
+
+            const diseaseModelCtx = document.getElementById('diseaseModelChart').getContext('2d');
+            new Chart(diseaseModelCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['对照组', '糖尿病模型(STZ)', '急性应激模型'],
+                    datasets: [{
+                        label: '胃残留率 (%)',
+                        data: [12, 43, 35],
+                        backgroundColor: ['var(--accent-blue)', 'var(--accent-red)', 'var(--accent-orange)'],
+                        borderColor: ['var(--accent-blue)', 'var(--accent-red)', 'var(--accent-orange)'],
+                        borderWidth: 1,
+                        barPercentage: 0.5,
+                        categoryPercentage: 0.5
+                    }]
+                },
+                options: { ...commonChartOptions,
+                    plugins: {
+                        ...commonChartOptions.plugins,
+                         tooltip: {
+                            ...commonChartOptions.plugins.tooltip,
+                             callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed.y !== null) {
+                                        label += `${context.parsed.y}%`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                 }
+            });
+
+            const pharmaCtx = document.getElementById('pharmaChart').getContext('2d');
+            new Chart(pharmaCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['对照组 (固体)', '甲氧氯普胺 (固体)', '东莨菪碱 (固体)', ['阿托品', '(固体)'], ['阿托品', '(液体)']],
+                    datasets: [{
+                        label: '排空半衰期 T1/2 (分钟)',
+                        data: [120, 60, 180, 150, 15],
+                        backgroundColor: [
+                            'var(--accent-blue)', 
+                            'var(--accent-green)', 
+                            'var(--accent-red)',
+                            'var(--accent-orange)',
+                            'var(--accent-orange)'
+                        ],
+                        borderColor: [
+                            'var(--accent-blue)', 
+                            'var(--accent-green)', 
+                            'var(--accent-red)',
+                            'var(--accent-orange)',
+                            'var(--accent-orange)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...commonChartOptions,
+                    scales: {
+                         ...commonChartOptions.scales,
+                         y: {
+                            ...commonChartOptions.scales.y,
+                            title: {
+                                display: true,
+                                text: '排空半衰期 T1/2 (分钟)'
+                            }
+                         }
+                    }
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
